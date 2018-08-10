@@ -620,7 +620,7 @@ static void init_static_allocations()
 	struct tm tm;
 	time_t t = 0;
 
-	tzset();
+	//tzset();
 	gmtime_r(&t, &tm);
 	localtime_r(&t, &tm);
 }
@@ -1030,6 +1030,7 @@ leak_detective_t *leak_detective_create()
 
 	if (register_hooks())
 	{
+		tzset();
 		enable_leak_detective();
 	}
 	return &this->public;
