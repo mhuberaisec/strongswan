@@ -109,11 +109,6 @@ bool vici_verify_type(vici_type_t type, u_int section, bool list)
 			DBG1(DBG_ENC, "'%N' within section", vici_type_names, type);
 			return FALSE;
 		}
-		if (list)
-		{
-			DBG1(DBG_ENC, "'%N' within list", vici_type_names, type);
-			return FALSE;
-		}
 	}
 	return TRUE;
 }
