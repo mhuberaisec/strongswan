@@ -311,6 +311,10 @@ METHOD(socket_t, receiver, status_t,
 			DBG1(DBG_NET, "receive buffer too small, packet discarded");
 			return FAILED;
 		}
+		// Prints for a Transport Packet: SPI (4byte), sequence number (4 byte), encrypted payload
+		// (i.e. protocol-header and payload inside the original ip packet), ICV (optional
+		// authentication data)
+		// at this point, it seems that we only get the ESP packet, but not the prepended IP header
 		DBG3(DBG_NET, "received packet %b", buffer, bytes_read);
 
 		/* read ancillary data to get destination address */

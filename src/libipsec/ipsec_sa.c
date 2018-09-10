@@ -21,6 +21,8 @@
 #include <library.h>
 #include <utils/debug.h>
 
+#include <tme.h>
+
 typedef struct private_ipsec_sa_t private_ipsec_sa_t;
 
 /**
@@ -301,8 +303,12 @@ ipsec_sa_t *ipsec_sa_create(uint32_t spi, host_t *src, host_t *dst,
 	}
 	if (mode != MODE_TUNNEL)
 	{
+#ifndef TME
 		DBG1(DBG_ESP, "  IPsec SA: unsupported mode");
 		return NULL;
+#else
+		DBG1(DBG_ESP, "  IPsec SA: unsupported mode (WARNING ONLY)");
+#endif
 	}
 
 	INIT(this,

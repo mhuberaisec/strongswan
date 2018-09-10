@@ -72,16 +72,27 @@ struct private_ipsec_processor_t {
 static void deliver_inbound(private_ipsec_processor_t *this,
 							esp_packet_t *packet)
 {
+	//we need to change the dest addr of the ip packet
+	ip_packet_t *old_packet = packet->extract_payload(packet);
+	host_t *new_dest = host_create_from_string("192.168.2.1", 32);
+
+	ip_packet_t *new_packet = ip_packet_create_from_data(old_packet->get_source(old_packet),
+		new_dest, old_packet->get_next_header(old_packet), old_packet->get_payload(old_packet));
+
+	DBG2(DBG_ESP, "deliver_inbound: new inbound IPsec packet: %#H == %#H [%hhu]",
+		new_packet->get_source(new_packet), new_packet->get_destination(new_packet),
+                new_packet->get_next_header(new_packet));
+
 	this->lock->read_lock(this->lock);
 	if (this->inbound.cb)
 	{
-		this->inbound.cb(this->inbound.data, packet->extract_payload(packet));
+		this->inbound.cb(this->inbound.data, new_packet);
 	}
 	else
 	{
 		DBG2(DBG_ESP, "no inbound callback registered, dropping packet");
 	}
-	packet->destroy(packet);
+	old_packet->destroy(old_packet);
 	this->lock->unlock(this->lock);
 }
 
@@ -133,6 +144,11 @@ static job_requeue_t process_inbound(private_ipsec_processor_t *this)
 	ipsec->sas->checkin(ipsec->sas, sa);
 
 	next_header = packet->get_next_header(packet);
+
+	DBG2(DBG_ESP, "orig inbound IPsec packet: %#H == %#H [%hhu]",
+		packet->get_source(packet), packet->get_destination(packet),
+		packet->get_next_header(packet));
+
 	switch (next_header)
 	{
 		case IPPROTO_IPIP:
@@ -144,6 +160,7 @@ static job_requeue_t process_inbound(private_ipsec_processor_t *this)
 													 ip_packet, TRUE, reqid);
 			if (policy)
 			{
+
 				deliver_inbound(this, packet);
 				policy->destroy(policy);
 				break;
@@ -193,8 +210,26 @@ static job_requeue_t process_outbound(private_ipsec_processor_t *this)
 	ip_packet_t *packet;
 	ipsec_sa_t *sa;
 	host_t *src, *dst;
+	host_t *new_src;
+	host_t *old_src;
+	char *host_ip = "192.168.1.129";
 
 	packet = (ip_packet_t*)this->outbound_queue->dequeue(this->outbound_queue);
+
+	// in transport mode, we're going to discard the encapsulated IP header
+	// we can overwrite the ip src header information to find the policy struct
+	DBG2(DBG_ESP, "orig outbound IPsec packet: %#H == %#H [%hhu]",
+		 packet->get_source(packet), packet->get_destination(packet),
+		 packet->get_next_header(packet));
+
+	new_src = host_create_from_string(host_ip, 32);
+	old_src = packet->get_source(packet);
+	old_src->destroy(old_src);
+	packet->set_source(packet, new_src);
+
+	DBG2(DBG_ESP, "new outbound IPsec packet: %#H == %#H [%hhu]",
+		 packet->get_source(packet), packet->get_destination(packet),
+		 packet->get_next_header(packet));
 
 	policy = ipsec->policies->find_by_packet(ipsec->policies, packet, FALSE, 0);
 	if (!policy)
@@ -218,6 +253,9 @@ static job_requeue_t process_outbound(private_ipsec_processor_t *this)
 	}
 	src = sa->get_source(sa);
 	dst = sa->get_destination(sa);
+	// for transport mode: packet should not be the ipv4 packet, but its payload (call get_payload)
+	// esp_packet_create_from_payload then gets a chunk_t instead of an ipv4 packet
+	// we need a call to get_next_header of the original ipv4 packet in order to set the next field in the esp packet
 	esp_packet = esp_packet_create_from_payload(src->clone(src),
 												dst->clone(dst), packet);
 	if (esp_packet->encrypt(esp_packet, sa->get_esp_context(sa),
@@ -231,6 +269,7 @@ static job_requeue_t process_outbound(private_ipsec_processor_t *this)
 	sa->update_usestats(sa, packet->get_encoding(packet).len);
 	ipsec->sas->checkin(ipsec->sas, sa);
 	policy->destroy(policy);
+	//TODO this function finally calls "send_no_marker" in src/libcharon/network/sender.c
 	send_outbound(this, esp_packet);
 	return JOB_REQUEUE_DIRECT;
 }

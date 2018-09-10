@@ -45,6 +45,7 @@ struct ip_packet_t {
 	 * @return				source host
 	 */
 	host_t *(*get_source)(ip_packet_t *this);
+	bool (*set_source)(ip_packet_t *this, host_t *new_src);
 
 	/**
 	 * Get the destination address of this packet
@@ -73,6 +74,7 @@ struct ip_packet_t {
 	 * @return				IP payload (internal data)
 	 */
 	chunk_t (*get_payload)(ip_packet_t *this);
+	bool (*set_payload)(ip_packet_t *this, chunk_t new_payload);
 
 	/**
 	 * Clone the IP packet
@@ -114,6 +116,8 @@ ip_packet_t *ip_packet_create(chunk_t packet);
  */
 ip_packet_t *ip_packet_create_from_data(host_t *src, host_t *dst,
 										uint8_t next_header, chunk_t data);
+ip_packet_t *ip_packet_create_from_data2(host_t *src, host_t *dst,
+										uint8_t next_header, chunk_t data, bool fix_transp);
 
 /**
  * Encode a UDP packet from the given data.

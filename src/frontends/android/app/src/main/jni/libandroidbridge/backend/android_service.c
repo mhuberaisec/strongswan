@@ -31,6 +31,8 @@
 #include <threading/rwlock.h>
 #include <threading/thread.h>
 
+#include <tme.h>
+
 typedef struct private_android_service_t private_android_service_t;
 
 /**
@@ -278,13 +280,17 @@ static bool setup_tun_device(private_android_service_t *this,
 
 	builder = charonservice->get_vpnservice_builder(charonservice);
 
+#ifndef TME
 	enumerator = ike_sa->create_virtual_ip_enumerator(ike_sa, TRUE);
 	while (enumerator->enumerate(enumerator, &vip))
 	{
+		DBG1(DBG_DMN, "checking is_anyaddr");
 		if (!vip->is_anyaddr(vip))
 		{
+			DBG1(DBG_DMN, "adding addr");
 			if (!builder->add_address(builder, vip))
 			{
+				DBG1(DBG_DMN, "failed adding addr");
 				break;
 			}
 			vip_found = TRUE;
@@ -292,6 +298,15 @@ static bool setup_tun_device(private_android_service_t *this,
 	}
 	enumerator->destroy(enumerator);
 
+#else
+	if (!builder->add_address(builder, host_create_from_string("192.168.2.1", 24)))
+	{
+		DBG1(DBG_DMN, "failed adding addr");
+	}
+	else{
+		vip_found = TRUE;
+	}
+#endif
 	if (!vip_found)
 	{
 		DBG1(DBG_DMN, "setting up TUN device failed, no virtual IP found");
@@ -757,7 +772,11 @@ static job_requeue_t initiate(private_android_service_t *this)
 				.jitter = 300 /* 5min */
 			},
 		},
+#ifndef TME
 		.mode = MODE_TUNNEL,
+#else
+		.mode = MODE_TRANSPORT,
+#endif
 		.dpd_action = ACTION_RESTART,
 		.close_action = ACTION_RESTART,
 	};
@@ -790,8 +809,10 @@ static job_requeue_t initiate(private_android_service_t *this)
 	}
 
 	peer_cfg = peer_cfg_create("android", ike_cfg, &peer);
+#ifndef TME
 	peer_cfg->add_virtual_ip(peer_cfg, host_create_any(AF_INET));
 	peer_cfg->add_virtual_ip(peer_cfg, host_create_any(AF_INET6));
+#endif
 
 	type = this->settings->get_str(this->settings, "connection.type", NULL);
 	/* local auth config */

@@ -102,9 +102,9 @@ enum level_t {
 	LEVEL_PRIVATE = 4,
 };
 
-#ifndef DEBUG_LEVEL
+//#ifndef DEBUG_LEVEL
 # define DEBUG_LEVEL 4
-#endif /* DEBUG_LEVEL */
+//#endif /* DEBUG_LEVEL */
 
 /** debug macros, they call the dbg function hook */
 #if DEBUG_LEVEL >= 0

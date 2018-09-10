@@ -31,6 +31,8 @@
 #include <processing/jobs/inactivity_job.h>
 #include <processing/jobs/initiate_tasks_job.h>
 
+#include <tme.h>
+
 typedef struct private_child_create_t private_child_create_t;
 
 /**
@@ -646,6 +648,9 @@ static status_t select_and_install(private_child_create_t *this,
 				}
 				if (this->config->get_mode(this->config) != MODE_TRANSPORT)
 				{
+#ifdef TME
+					DBG1(DBG_IKE, "not using transport mode, not set in config");
+#endif
 					this->mode = MODE_TUNNEL;
 				}
 				break;

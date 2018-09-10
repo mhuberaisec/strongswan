@@ -146,6 +146,13 @@ METHOD(ip_packet_t, get_source, host_t*,
 	return this->src;
 }
 
+METHOD(ip_packet_t, set_source, bool,
+	private_ip_packet_t *this, host_t *new_src)
+{
+	this->src = new_src;
+	return true;
+}
+
 METHOD(ip_packet_t, get_destination, host_t*,
 	private_ip_packet_t *this)
 {
@@ -156,6 +163,14 @@ METHOD(ip_packet_t, get_encoding, chunk_t,
 	private_ip_packet_t *this)
 {
 	return this->packet;
+}
+
+METHOD(ip_packet_t, set_payload, bool,
+	private_ip_packet_t *this, chunk_t new_payload)
+{
+	this->payload.ptr = new_payload.ptr;
+	this->payload.len = new_payload.len;
+	return true;
 }
 
 METHOD(ip_packet_t, get_payload, chunk_t,
@@ -349,7 +364,7 @@ ip_packet_t *ip_packet_create(chunk_t packet)
 		}
 #endif /* HAVE_NETINET_IP6_H */
 		default:
-			DBG1(DBG_ESP, "unsupported IP version");
+			DBG1(DBG_ESP, "unsupported IP version: %d", version);
 			goto failed;
 	}
 
@@ -357,10 +372,12 @@ ip_packet_t *ip_packet_create(chunk_t packet)
 		.public = {
 			.get_version = _get_version,
 			.get_source = _get_source,
+			.set_source = _set_source,
 			.get_destination = _get_destination,
 			.get_next_header = _get_next_header,
 			.get_encoding = _get_encoding,
 			.get_payload = _get_payload,
+			.set_payload = _set_payload,
 			.clone = _clone_,
 			.destroy = _destroy,
 		},
@@ -491,8 +508,9 @@ static void fix_transport_header(host_t *src, host_t *dst, uint8_t proto,
 /**
  * Described in header.
  */
-ip_packet_t *ip_packet_create_from_data(host_t *src, host_t *dst,
-										uint8_t next_header, chunk_t data)
+ip_packet_t *ip_packet_create_from_data2(host_t *src, host_t *dst,
+										uint8_t next_header, chunk_t
+										data, bool fix_transp)
 {
 	chunk_t packet;
 	int family;
@@ -520,7 +538,8 @@ ip_packet_t *ip_packet_create_from_data(host_t *src, host_t *dst,
 			ip.ip_sum = chunk_internet_checksum(chunk_from_thing(ip));
 
 			packet = chunk_cat("cc", chunk_from_thing(ip), data);
-			fix_transport_header(src, dst, next_header, chunk_skip(packet, 20));
+			if (fix_transp)
+			    fix_transport_header(src, dst, next_header, chunk_skip(packet, 20));
 			return ip_packet_create(packet);
 		}
 #ifdef HAVE_NETINET_IP6_H
@@ -536,7 +555,8 @@ ip_packet_t *ip_packet_create_from_data(host_t *src, host_t *dst,
 			memcpy(&ip.ip6_dst, dst->get_address(dst).ptr, sizeof(ip.ip6_dst));
 
 			packet = chunk_cat("cc", chunk_from_thing(ip), data);
-			fix_transport_header(src, dst, next_header, chunk_skip(packet, 40));
+			if (fix_transp)
+			    fix_transport_header(src, dst, next_header, chunk_skip(packet, 40));
 			return ip_packet_create(packet);
 		}
 #endif /* HAVE_NETINET_IP6_H */
@@ -546,6 +566,11 @@ ip_packet_t *ip_packet_create_from_data(host_t *src, host_t *dst,
 	}
 }
 
+ip_packet_t *ip_packet_create_from_data(host_t *src, host_t *dst,
+										uint8_t next_header, chunk_t data)
+{
+    return ip_packet_create_from_data2(src, dst, next_header, data, true);
+}
 /**
  * Described in header.
  */

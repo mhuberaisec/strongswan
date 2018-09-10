@@ -29,6 +29,8 @@
 #include <netinet/in.h>
 #endif
 
+#include <tme.h>
+
 typedef struct private_esp_packet_t private_esp_packet_t;
 
 /**
@@ -174,6 +176,7 @@ static bool remove_padding(private_esp_packet_t *this, chunk_t plaintext)
 	uint8_t next_header, pad_length;
 	chunk_t padding, payload;
 	bio_reader_t *reader;
+	chunk_t packet_payload;
 
 	reader = bio_reader_create(plaintext);
 	if (!reader->read_uint8_end(reader, &next_header) ||
@@ -188,16 +191,44 @@ static bool remove_padding(private_esp_packet_t *this, chunk_t plaintext)
 		DBG1(DBG_ESP, "parsing ESP payload failed: invalid padding");
 		goto failed;
 	}
-	this->payload = ip_packet_create(reader->peek(reader));
+
+	// we need a new empty ip packet to assign it to this->payload
+	// header of the new packet: clone of this->packet (which is the raw recvd packet_t
+	// new payload: the data which we can read with the reade
+	// this: private_esp_packet_t
+	// payload: ip_packet_t
+	// packet: packet_t
+	// packet->get_data: chunk_t
+	DBG1(DBG_ESP, "remove_padding: next_hdr should be protocol-depenent: %d, padlen %d",
+		next_header, pad_length);
+	// from this->packet as packet_t, create an ip_packet_t
+	DBG2(DBG_ESP, "remove_padding: orig inbound packet addressing: %#H == %#H",
+                this->packet->get_source(this->packet), this->packet->get_destination(this->packet));
+
+	packet_payload = reader->peek(reader);
+
+	DBG1(DBG_ESP, "test, extracted payload: %B", &packet_payload);
+
+	//this->payload = ip_packet_create(chunk_clone(this->packet->get_data(this->packet)));
+	// create ip-packet with header from protocol-dependent packet. at this point, we do not see the
+	// initially received ip header  
+	this->payload = ip_packet_create_from_data2(this->packet->get_source(this->packet),
+		this->packet->get_destination(this->packet), next_header, packet_payload, false);
+	DBG2(DBG_ESP, "remove_padding: created inbound IPsec packet: %#H == %#H [%hhu]",
+	         this->payload->get_source(this->payload), this->payload->get_destination(this->payload),
+		 this->payload->get_next_header(this->payload));
+
 	reader->destroy(reader);
 	if (!this->payload)
 	{
 		DBG1(DBG_ESP, "parsing ESP payload failed: unsupported payload");
 		return FALSE;
 	}
-	this->next_header = next_header;
+	this->next_header = IPPROTO_IPIP;
 	payload = this->payload->get_encoding(this->payload);
 
+	// at this place, we print our created ip header + 'the protocol-dependent header + payload',
+	// see graphics on unixwiz.net
 	DBG3(DBG_ESP, "ESP payload:\n  payload %B\n  padding %B\n  "
 		 "padding length = %hhu, next header = %hhu", &payload, &padding,
 		 pad_length, this->next_header);
@@ -243,6 +274,10 @@ METHOD(esp_packet_t, decrypt, status_t,
 			 get_source(this), get_destination(this), spi, seq);
 		return VERIFY_ERROR;
 	}
+	// basically the same output as in socket_default_socket.c
+	// similarly, the ip header of the incoming packet itself is not displayed
+	// when we use no crypto-cipher, the last bytes are the padding, padlen, next_hdr,
+	// e.g., for padlen 2 and next_hdr 1, we have 01 02 02 01 (padding starts with 01, 02, ...)
 	DBG3(DBG_ESP, "ESP decryption:\n  SPI %.8x [seq %u]\n  IV %B\n  "
 		 "encrypted %B\n  ICV %B", spi, seq, &iv, &ciphertext, &icv);
 
@@ -309,8 +344,17 @@ METHOD(esp_packet_t, encrypt, status_t,
 	icv.len = aead->get_icv_size(aead);
 
 	/* plaintext = payload, padding, pad_length, next_header */
+#ifndef TME
 	payload = this->payload ? this->payload->get_encoding(this->payload)
 							: chunk_empty;
+#else
+	//TODO !!!! changing this, changes the size of the overall packet,
+	//and it is possible that we do not consider this ...
+	//this would proably require to create a new ip packet...
+	//...at least, the ip packet handed over from process_outbound has wrong lenth information
+	payload = this->payload ? this->payload->get_payload(this->payload)
+							: chunk_empty;
+#endif
 	plainlen = payload.len + 2;
 	padding.len = pad_len(plainlen, blocksize);
 	/* ICV must be on a 4-byte boundary */
@@ -461,8 +505,12 @@ esp_packet_t *esp_packet_create_from_payload(host_t *src, host_t *dst,
 	this->payload = payload;
 	if (payload)
 	{
+#ifndef TME
 		this->next_header = payload->get_version(payload) == 4 ? IPPROTO_IPIP
 															   : IPPROTO_IPV6;
+#else
+		this->next_header = payload->get_next_header(payload);
+#endif
 	}
 	else
 	{

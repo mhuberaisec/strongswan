@@ -40,7 +40,7 @@
 #include <library.h>
 #include <threading/thread.h>
 
-#define ANDROID_DEBUG_LEVEL 1
+#define ANDROID_DEBUG_LEVEL 8
 #define ANDROID_RETRASNMIT_TRIES 3
 #define ANDROID_RETRANSMIT_TIMEOUT 2.0
 #define ANDROID_RETRANSMIT_BASE 1.4
