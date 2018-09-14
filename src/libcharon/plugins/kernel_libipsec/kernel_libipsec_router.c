@@ -124,6 +124,7 @@ static void deliver_plain(private_kernel_libipsec_router_t *this,
 	this->lock->read_lock(this->lock);
 	entry = this->tuns->get(this->tuns, &lookup);
 	tun = entry ? entry->tun : this->tun.tun;
+	// this is where we write our decrypted packet
 	tun->write_packet(tun, packet->get_encoding(packet));
 	this->lock->unlock(this->lock);
 	packet->destroy(packet);
@@ -136,6 +137,7 @@ static void process_plain(tun_device_t *tun)
 {
 	chunk_t raw;
 
+	// here, we read an IP packet from the TUN device
 	if (tun->read_packet(tun, &raw))
 	{
 		ip_packet_t *packet;

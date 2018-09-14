@@ -213,7 +213,7 @@ static bool remove_padding(private_esp_packet_t *this, chunk_t plaintext)
 	// create ip-packet with header from protocol-dependent packet. at this point, we do not see the
 	// initially received ip header  
 	this->payload = ip_packet_create_from_data2(this->packet->get_source(this->packet),
-		this->packet->get_destination(this->packet), next_header, packet_payload, false);
+		this->packet->get_destination(this->packet), next_header, packet_payload, false, 0x0, 0x0, 0x40);
 	DBG2(DBG_ESP, "remove_padding: created inbound IPsec packet: %#H == %#H [%hhu]",
 	         this->payload->get_source(this->payload), this->payload->get_destination(this->payload),
 		 this->payload->get_next_header(this->payload));

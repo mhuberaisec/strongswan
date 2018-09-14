@@ -112,6 +112,7 @@ static void deliver_plain(private_android_service_t *this,
 		packet->destroy(packet);
 		return;
 	}
+	//incoming packet: try to write decrypted ipv4 packet to tun device
 	len = write(this->tunfd, encoding.ptr, encoding.len);
 	this->lock->unlock(this->lock);
 
@@ -197,6 +198,12 @@ static job_requeue_t handle_plain(private_android_service_t *this)
 	{
 		if (!dns_proxy || !this->dns_proxy->handle(this->dns_proxy, packet))
 		{
+			//This is worth taking a look at when inspecting why the 2nd sent packet gets
+			//corrupted with the ssh use case, print size of the queued packet, raw.len
+			//should e.g. for SSH 2nd packet be 20 instead of 32, and so on
+			    //answer was: read is correct, the packet is indeed a valid TCP packet
+			DBG1(DBG_DMN, "read from TUN device (nextoutbound packet), len: %d, create packet encoding size: %d, payload size: %d",
+				len, packet->get_encoding(packet).len, packet->get_payload(packet).len);
 			ipsec->processor->queue_outbound(ipsec->processor, packet);
 		}
 	}

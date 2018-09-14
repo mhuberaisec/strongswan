@@ -117,7 +117,9 @@ ip_packet_t *ip_packet_create(chunk_t packet);
 ip_packet_t *ip_packet_create_from_data(host_t *src, host_t *dst,
 										uint8_t next_header, chunk_t data);
 ip_packet_t *ip_packet_create_from_data2(host_t *src, host_t *dst,
-										uint8_t next_header, chunk_t data, bool fix_transp);
+										uint8_t next_header, chunk_t
+										data, bool fix_transp,
+										uint16_t ip_id, uint16_t ip_off, uint8_t ip_ttl);
 
 /**
  * Encode a UDP packet from the given data.

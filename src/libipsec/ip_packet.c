@@ -510,7 +510,8 @@ static void fix_transport_header(host_t *src, host_t *dst, uint8_t proto,
  */
 ip_packet_t *ip_packet_create_from_data2(host_t *src, host_t *dst,
 										uint8_t next_header, chunk_t
-										data, bool fix_transp)
+										data, bool fix_transp,
+										uint16_t ip_id, uint16_t ip_off, uint8_t ip_ttl) //TODO last 2 params only for Ipv4 set
 {
 	chunk_t packet;
 	int family;
@@ -530,7 +531,9 @@ ip_packet_t *ip_packet_create_from_data2(host_t *src, host_t *dst,
 				.ip_v = 4,
 				.ip_hl = 5,
 				.ip_len = htons(20 + data.len),
-				.ip_ttl = 0x80,
+				.ip_id = ip_id,
+				.ip_off = ip_off,
+				.ip_ttl = ip_ttl,
 				.ip_p = next_header,
 			};
 			memcpy(&ip.ip_src, src->get_address(src).ptr, sizeof(ip.ip_src));
@@ -569,7 +572,7 @@ ip_packet_t *ip_packet_create_from_data2(host_t *src, host_t *dst,
 ip_packet_t *ip_packet_create_from_data(host_t *src, host_t *dst,
 										uint8_t next_header, chunk_t data)
 {
-    return ip_packet_create_from_data2(src, dst, next_header, data, true);
+    return ip_packet_create_from_data2(src, dst, next_header, data, true, 0x0, 0x0, 0x80);
 }
 /**
  * Described in header.

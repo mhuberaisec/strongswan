@@ -471,6 +471,7 @@ static job_requeue_t receive_packets(private_receiver_t *this)
 			this->esp_cb_mutex->lock(this->esp_cb_mutex);
 			if (this->esp_cb.cb)
 			{
+				//this is the place where our packet is being enqued, it's the fct receiver_esp_cb
 				this->esp_cb.cb(this->esp_cb.data, packet);
 			}
 			else

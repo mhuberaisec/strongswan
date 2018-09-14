@@ -75,13 +75,23 @@ static void deliver_inbound(private_ipsec_processor_t *this,
 	//we need to change the dest addr of the ip packet
 	ip_packet_t *old_packet = packet->extract_payload(packet);
 	host_t *new_dest = host_create_from_string("192.168.2.1", 32);
+	chunk_t final_encoding;
 
-	ip_packet_t *new_packet = ip_packet_create_from_data(old_packet->get_source(old_packet),
-		new_dest, old_packet->get_next_header(old_packet), old_packet->get_payload(old_packet));
+	// TODO this is a very bad hack: the IPv4 header should look exactly like the initially received ipv4
+	// header. 0x4000 and 0x40 is the information which was always in the first received packet and this
+	// code is intended to make us 'survive' the 1st server-rcvd packet and make ssh send out a good 2nd
+	// packet. However, we do not have access to the received ipv4 header from the code so far. so we can
+	// more or less just guess how the header should look like. currently, we make it look like the packet
+	// goes out via wireshark, but that doesn't seem to work well.
+	ip_packet_t *new_packet = ip_packet_create_from_data2(old_packet->get_source(old_packet),
+		new_dest, old_packet->get_next_header(old_packet), old_packet->get_payload(old_packet), false,
+		    0x0, htons(0x4000), 0x40);
 
-	DBG2(DBG_ESP, "deliver_inbound: new inbound IPsec packet: %#H == %#H [%hhu]",
+	DBG2(DBG_ESP, "deliver_inbound: final inbound IP packet: %#H == %#H [%hhu]",
 		new_packet->get_source(new_packet), new_packet->get_destination(new_packet),
                 new_packet->get_next_header(new_packet));
+	final_encoding = new_packet->get_encoding(new_packet);
+	DBG2(DBG_ESP, "deliver_inbound: printing its payload: %B", &final_encoding);
 
 	this->lock->read_lock(this->lock);
 	if (this->inbound.cb)
@@ -93,6 +103,12 @@ static void deliver_inbound(private_ipsec_processor_t *this,
 		DBG2(DBG_ESP, "no inbound callback registered, dropping packet");
 	}
 	old_packet->destroy(old_packet);
+	//Destruction of old packet does not seem to corrupt anything, so we created a good new one
+	//DBG2(DBG_ESP, "deliver_inbound(2): final inbound IP packet: %#H == %#H [%hhu]",
+	//	new_packet->get_source(new_packet), new_packet->get_destination(new_packet),
+        //        new_packet->get_next_header(new_packet));
+	//final_encoding = new_packet->get_encoding(new_packet);
+	//DBG2(DBG_ESP, "deliver_inbound(2): printing its payload: %B", &final_encoding);
 	this->lock->unlock(this->lock);
 }
 
@@ -212,7 +228,7 @@ static job_requeue_t process_outbound(private_ipsec_processor_t *this)
 	host_t *src, *dst;
 	host_t *new_src;
 	host_t *old_src;
-	char *host_ip = "192.168.1.129";
+	char *host_ip = "192.168.1.107";
 
 	packet = (ip_packet_t*)this->outbound_queue->dequeue(this->outbound_queue);
 
