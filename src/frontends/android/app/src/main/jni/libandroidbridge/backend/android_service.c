@@ -113,6 +113,12 @@ static void deliver_plain(private_android_service_t *this,
 		return;
 	}
 	//incoming packet: try to write decrypted ipv4 packet to tun device
+	//This was an attempt to omit the iphv hdr, but gives invalid argument
+	//DBG1(DBG_DMN, "encoding with ipv4 hdr: %p, %d", encoding.ptr, encoding.len);
+	//encoding.ptr += 20;
+	//encoding.len -= 20;
+	//DBG1(DBG_DMN, "sending encoding without ipv4 hdr: %p, %d", encoding.ptr, encoding.len);
+
 	len = write(this->tunfd, encoding.ptr, encoding.len);
 	this->lock->unlock(this->lock);
 

@@ -59,6 +59,7 @@ METHOD(socket_manager_t, receiver, status_t,
 	private_socket_manager_t *this, packet_t **packet)
 {
 	status_t status;
+	//chunk_t test;
 	this->lock->read_lock(this->lock);
 	if (!this->socket)
 	{
@@ -69,6 +70,9 @@ METHOD(socket_manager_t, receiver, status_t,
 	/* receive is blocking and the thread can be cancelled */
 	thread_cleanup_push((thread_cleanup_t)this->lock->unlock, this->lock);
 	status = this->socket->receive(this->socket, packet);
+	//Already here, we only receive the ESP packet from the stack
+	//test = (*packet)->get_data(*packet);
+	//DBG1(DBG_NET, "!!!receive the following chunk: %B", &test);
 	thread_cleanup_pop(TRUE);
 	return status;
 }
